@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+runs/
+data/public/**/*.jsonl
+*.egg-info/
+dist/
+build/
+.DS_Store
+train.log
+explainer/out/
+demo-recordings/pw-browsers/
+demo-recordings/check/
+demo-recordings/raw/

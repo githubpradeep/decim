@@ -1,0 +1,21 @@
+[project]
+name = "decision-model"
+version = "0.1.0"
+description = "Jev-like decision model: shared state, typed questions, pointer-head probabilities."
+requires-python = ">=3.11"
+dependencies = ["torch>=2.2", "numpy>=1.26", "transformers>=4.55", "datasets>=3.0"]
+
+[project.scripts]
+decision-train = "decision_model.train:main"
+decision-decide = "decision_model.decide:main"
+decision-demo = "decision_model.demo:main"
+decision-serve = "decision_model.serve:main"
+decision-prepare-public = "decision_model.datasets.public:main"
+decision-train-public = "decision_model.train_suite:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

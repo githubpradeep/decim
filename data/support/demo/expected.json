@@ -1,0 +1,62 @@
+[
+  {
+    "file": "01-extra-capture-on-order-7781.json",
+    "queue": "billing",
+    "escalate": false,
+    "priority": 1
+  },
+  {
+    "file": "02-no-one-can-complete-checkout.json",
+    "queue": "product",
+    "escalate": true,
+    "priority": 3
+  },
+  {
+    "file": "03-reset-link-is-missing.json",
+    "queue": "access",
+    "escalate": false,
+    "priority": 2
+  },
+  {
+    "file": "04-leave-the-charge-send-the-crate.json",
+    "queue": "shipping",
+    "escalate": false,
+    "priority": 2
+  },
+  {
+    "file": "05-demand-letter-goes-out-at-noon.json",
+    "queue": "billing",
+    "escalate": true,
+    "priority": 3
+  },
+  {
+    "file": "06-receipt-whenever-you-have-a-minute.json",
+    "queue": "billing",
+    "escalate": false,
+    "priority": 0
+  },
+  {
+    "file": "07-frame-arrived-with-a-broken-corner.json",
+    "queue": "shipping",
+    "escalate": false,
+    "priority": 1
+  },
+  {
+    "file": "08-staff-cannot-sign-in-and-the-sale-starts.json",
+    "queue": "access",
+    "escalate": true,
+    "priority": 3
+  },
+  {
+    "file": "09-screen-still-says-label-created.json",
+    "queue": "product",
+    "escalate": false,
+    "priority": 1
+  },
+  {
+    "file": "10-courier-is-in-the-lobby.json",
+    "queue": "shipping",
+    "escalate": false,
+    "priority": 3
+  }
+]

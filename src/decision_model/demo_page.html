@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System One</title>
+  <style>
+    :root {
+      --bg: #07080c;
+      --ink: #f4f1e8;
+      --dim: #8b909c;
+      --line: #22262f;
+      --lime: #ddff4a;
+      --cell: #12141b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+    body {
+      font-family: ui-sans-serif, "SF Pro Display", "Segoe UI", sans-serif;
+      min-height: 100%;
+    }
+    .stage {
+      min-height: 100%;
+      padding: 28px 36px 32px;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      gap: 14px;
+    }
+    header, .foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .brand, .badge, .kicker, .cell, .prob, .foot {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    .brand { letter-spacing: 0.16em; font-size: 12px; color: var(--dim); }
+    .badge {
+      border: 1px solid var(--lime);
+      color: var(--lime);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+    .kicker { margin: 8px 0 0; color: var(--lime); font-size: 13px; letter-spacing: 0.04em; min-height: 1.2em; }
+    #line {
+      margin: 0;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      font-weight: 560;
+      max-width: 16ch;
+    }
+    #line i {
+      display: inline-block;
+      width: 2px;
+      height: 0.85em;
+      background: var(--lime);
+      margin-left: 3px;
+      vertical-align: -2px;
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    #hero { display: flex; align-items: baseline; gap: 18px; min-height: 72px; }
+    #winner { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -0.04em; }
+    .prob { font-size: 28px; color: var(--lime); }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      align-content: start;
+    }
+    .cell {
+      background: var(--cell);
+      color: var(--dim);
+      border-radius: 8px;
+      padding: 8px 8px 7px;
+      font-size: 11px;
+      letter-spacing: -0.02em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cell.on {
+      background: var(--lime);
+      color: #111;
+      transform: translateY(-2px);
+      transition: background 0.35s ease, color 0.35s ease, transform 0.35s ease;
+    }
+    #trio { display: none; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    #trio.show { display: grid; }
+    .meter {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px 16px 14px;
+      background: #0d0f14;
+    }
+    .meter small { color: var(--dim); font-family: ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: 0.08em; }
+    .meter strong { display: block; margin-top: 10px; font-size: 32px; letter-spacing: -0.04em; }
+    .meter em { display: block; margin-top: 6px; font-style: normal; color: var(--lime); font-family: ui-monospace, Menlo, monospace; }
+    #grid.hide { display: none; }
+    form { display: flex; gap: 10px; align-items: center; }
+    input[type="text"] {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink);
+      font: 16px/1.4 ui-sans-serif, "SF Pro Display", sans-serif;
+      padding: 8px 0;
+      outline: none;
+    }
+    button {
+      background: var(--ink);
+      color: #111;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font: 13px/1 ui-sans-serif, sans-serif;
+      cursor: pointer;
+    }
+    button.ghost { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+    #error { color: #ff8d7a; font-size: 13px; min-height: 1em; }
+    @media (max-width: 800px) {
+      .stage { padding: 18px; }
+      #grid { grid-template-columns: repeat(3, 1fr); }
+      #trio.show { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <header>
+      <div class="brand">SYSTEM ONE</div>
+      <div class="badge" id="badge">0 OUTPUT TOKENS</div>
+    </header>
+    <div>
+      <p class="kicker" id="kicker"></p>
+      <h1 id="line"></h1>
+    </div>
+    <div id="hero">
+      <h2 id="winner"></h2>
+      <div class="prob" id="prob"></div>
+    </div>
+    <div id="grid"></div>
+    <div id="trio"></div>
+    <div>
+      <form id="own">
+        <input id="text" type="text" placeholder="Type a sentence. The field of 60 answers moves." autocomplete="off">
+        <button class="ghost" id="replay" type="button">Replay</button>
+        <button type="submit">Score</button>
+      </form>
+      <p id="error"></p>
+    </div>
+  </div>
+  <script>
+    const INTENT = {
+      alarm_query: "alarm query", alarm_remove: "alarm remove", alarm_set: "alarm set",
+      audio_volume_down: "volume down", audio_volume_mute: "volume mute", audio_volume_other: "volume other", audio_volume_up: "volume up",
+      calendar_query: "calendar query", calendar_remove: "calendar remove", calendar_set: "calendar set",
+      cooking_query: "cooking query", cooking_recipe: "cooking recipe",
+      datetime_convert: "datetime convert", datetime_query: "datetime query",
+      email_addcontact: "add contact", email_query: "email query", email_querycontact: "find contact", email_sendemail: "send email",
+      general_greet: "greet", general_joke: "joke", general_quirky: "quirky",
+      iot_cleaning: "cleaning", iot_coffee: "coffee",
+      iot_hue_lightchange: "light change", iot_hue_lightdim: "light dim", iot_hue_lightoff: "light off", iot_hue_lighton: "light on", iot_hue_lightup: "light up",
+      iot_wemo_off: "plug off", iot_wemo_on: "plug on",
+      lists_createoradd: "add to list", lists_query: "read list", lists_remove: "remove from list",
+      music_dislikeness: "dislike song", music_likeness: "like song", music_query: "music query", music_settings: "music settings", news_query: "news",
+      play_audiobook: "audiobook", play_game: "game", play_music: "play music", play_podcasts: "podcast", play_radio: "radio",
+      qa_currency: "currency", qa_definition: "definition", qa_factoid: "fact", qa_maths: "math", qa_stock: "stock",
+      recommendation_events: "events", recommendation_locations: "places", recommendation_movies: "movies",
+      social_post: "post", social_query: "social",
+      takeaway_order: "order food", takeaway_query: "food query",
+      transport_query: "transit", transport_taxi: "taxi", transport_ticket: "ticket", transport_traffic: "traffic",
+      weather_query: "weather"
+    };
+    const CRITERIA = {
+      alarm_query: "alarm query", alarm_remove: "alarm remove", alarm_set: "alarm set",
+      audio_volume_down: "audio volume down", audio_volume_mute: "audio volume mute", audio_volume_other: "audio volume other", audio_volume_up: "audio volume up",
+      calendar_query: "calendar query", calendar_remove: "calendar remove", calendar_set: "calendar set",
+      cooking_query: "cooking query", cooking_recipe: "cooking recipe",
+      datetime_convert: "datetime convert", datetime_query: "datetime query",
+      email_addcontact: "email addcontact", email_query: "email query", email_querycontact: "email querycontact", email_sendemail: "email sendemail",
+      general_greet: "general greet", general_joke: "general joke", general_quirky: "general quirky",
+      iot_cleaning: "iot cleaning", iot_coffee: "iot coffee",
+      iot_hue_lightchange: "iot hue lightchange", iot_hue_lightdim: "iot hue lightdim", iot_hue_lightoff: "iot hue lightoff", iot_hue_lighton: "iot hue lighton", iot_hue_lightup: "iot hue lightup",
+      iot_wemo_off: "iot wemo off", iot_wemo_on: "iot wemo on",
+      lists_createoradd: "lists createoradd", lists_query: "lists query", lists_remove: "lists remove",
+      music_dislikeness: "music dislikeness", music_likeness: "music likeness", music_query: "music query", music_settings: "music settings", news_query: "news query",
+      play_audiobook: "play audiobook", play_game: "play game", play_music: "play music", play_podcasts: "play podcasts", play_radio: "play radio",
+      qa_currency: "qa currency", qa_definition: "qa definition", qa_factoid: "qa factoid", qa_maths: "qa maths", qa_stock: "qa stock",
+      recommendation_events: "recommendation events", recommendation_locations: "recommendation locations", recommendation_movies: "recommendation movies",
+      social_post: "social post", social_query: "social query",
+      takeaway_order: "takeaway order", takeaway_query: "takeaway query",
+      transport_query: "transport query", transport_taxi: "transport taxi", transport_ticket: "transport ticket", transport_traffic: "transport traffic",
+      weather_query: "weather query"
+    };
+    const EMOTION = { sadness: "sadness", joy: "joy", love: "love", anger: "anger", fear: "fear", surprise: "surprise" };
+    const REEL = [
+      { kicker: "60 intents. Watch one of them wake up.", state: "will it rain in seattle tomorrow", ask: ["intent"] },
+      { kicker: "Same 60. The mass moves.", state: "call me a taxi to the airport", ask: ["intent"] },
+      { kicker: "Same 60.", state: "tell me a joke", ask: ["intent"] },
+      { kicker: "Same 60.", state: "set an alarm for six tomorrow morning", ask: ["intent"] },
+      { kicker: "Same 60.", state: "play some jazz in the kitchen", ask: ["intent"] },
+      { kicker: "One paragraph. Three decisions. Still nothing generated.", state: "a wonderful, moving, and beautifully acted film. i am so happy i could dance around the room.", ask: ["emotion", "positive", "stars"] }
+    ];
+
+    const lineEl = document.querySelector("#line");
+    const kickerEl = document.querySelector("#kicker");
+    const winnerEl = document.querySelector("#winner");
+    const probEl = document.querySelector("#prob");
+    const gridEl = document.querySelector("#grid");
+    const trioEl = document.querySelector("#trio");
+    const errorEl = document.querySelector("#error");
+    const cells = {};
+    let playing = true;
+    let token = 0;
+    let caretTimer = null;
+
+    for (const key of Object.keys(INTENT)) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = INTENT[key];
+      cell.title = key;
+      gridEl.append(cell);
+      cells[key] = cell;
+    }
+
+    function questionsFor(ask) {
+      const questions = {};
+      for (const id of ask) {
+        if (id === "intent") questions.intent = { type: "choice", instructions: "Which assistant intent matches this utterance?", criteria: CRITERIA };
+        if (id === "emotion") questions.emotion = { type: "choice", instructions: "Which emotion does this message express?", criteria: EMOTION };
+        if (id === "positive") questions.positive = { type: "noul", instructions: "Is the sentiment of this sentence positive?", criteria: { true: "positive", false: "negative" } };
+        if (id === "stars") questions.stars = { type: "score", instructions: "What star rating does this review give?", criteria: ["1 star", "2 stars", "3 stars", "4 stars", "5 stars"] };
+      }
+      return questions;
+    }
+
+    function clearBoard() {
+      winnerEl.textContent = "";
+      probEl.textContent = "";
+      trioEl.classList.remove("show");
+      trioEl.replaceChildren();
+      for (const cell of Object.values(cells)) cell.classList.remove("on");
+    }
+
+    function setLine(text, caret) {
+      lineEl.textContent = text;
+      if (caret) {
+        const mark = document.createElement("i");
+        lineEl.append(mark);
+      }
+    }
+
+    function typeInto(text, run) {
+      return new Promise((resolve) => {
+        let i = 0;
+        const step = () => {
+          if (run !== token) return resolve(false);
+          setLine(text.slice(0, i), true);
+          if (i >= text.length) return resolve(true);
+          i += 1;
+          caretTimer = setTimeout(step, text.length > 80 ? 16 : 28);
+        };
+        step();
+      });
+    }
+
+    function showIntent(answer) {
+      trioEl.classList.remove("show");
+      gridEl.classList.remove("hide");
+      const ranked = Object.entries(answer.probabilities).sort((a, b) => b[1] - a[1]);
+      winnerEl.textContent = (INTENT[answer.choice] || answer.choice).toUpperCase();
+      probEl.textContent = ranked[0][1].toFixed(2);
+      for (const [key, cell] of Object.entries(cells)) {
+        cell.classList.toggle("on", key === answer.choice);
+      }
+    }
+
+    function showTrio(answers) {
+      gridEl.classList.add("hide");
+      trioEl.classList.add("show");
+      winnerEl.textContent = "";
+      probEl.textContent = "";
+      const emotion = answers.emotion;
+      const yes = answers.positive.noul;
+      const stars = answers.stars;
+      const mode = Object.entries(stars.probabilities).reduce((best, item) => item[1] > best[1] ? item : best);
+      const blocks = [
+        ["EMOTION", emotion.choice, emotion.probabilities[emotion.choice].toFixed(2)],
+        ["POSITIVE", yes >= 0.5 ? "yes" : "no", yes.toFixed(2)],
+        ["STARS", stars.legend[mode[0]], Number(stars.score).toFixed(2)]
+      ];
+      trioEl.replaceChildren();
+      for (const [label, value, figure] of blocks) {
+        const meter = document.createElement("div");
+        meter.className = "meter";
+        meter.innerHTML = `<small>${label}</small><strong>${value}</strong><em>${figure}</em>`;
+        trioEl.append(meter);
+      }
+    }
+
+    async function score(state, ask, run) {
+      errorEl.textContent = "";
+      const response = await fetch("/v1/systemone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state, questions: questionsFor(ask) }),
+      });
+      const body = await response.json();
+      if (run !== token) return;
+      if (!response.ok) throw new Error(body.error || "request failed");
+      document.querySelector("#badge").textContent = `${body.usage.output_tokens} OUTPUT TOKENS`;
+      if (ask.length === 1 && ask[0] === "intent") showIntent(body.answers.intent);
+      else showTrio(body.answers);
+    }
+
+    function sleep(ms, run) {
+      return new Promise((resolve) => setTimeout(() => resolve(run === token), ms));
+    }
+
+    async function reel() {
+      const run = ++token;
+      playing = true;
+      let index = 0;
+      while (playing && run === token) {
+        const scene = REEL[index % REEL.length];
+        kickerEl.textContent = scene.kicker;
+        clearBoard();
+        gridEl.classList.toggle("hide", scene.ask[0] !== "intent");
+        const typed = await typeInto(scene.state, run);
+        if (!typed || run !== token) return;
+        try {
+          await score(scene.state, scene.ask, run);
+        } catch (error) {
+          if (run !== token) return;
+          errorEl.textContent = error.message;
+          return;
+        }
+        const held = await sleep(scene.ask.length > 1 ? 3400 : 2200, run);
+        if (!held) return;
+        index += 1;
+      }
+    }
+
+    function takeOver() {
+      playing = false;
+      token += 1;
+      clearTimeout(caretTimer);
+    }
+
+    document.querySelector("#own").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const text = document.querySelector("#text").value.trim();
+      if (!text) return;
+      takeOver();
+      const run = token;
+      kickerEl.textContent = "Your sentence. 60 intents.";
+      setLine(text, false);
+      try {
+        await score(text, ["intent"], run);
+      } catch (error) {
+        errorEl.textContent = error.message;
+      }
+    });
+    document.querySelector("#replay").addEventListener("click", () => {
+      document.querySelector("#text").value = "";
+      reel();
+    });
+    document.querySelector("#text").addEventListener("focus", takeOver);
+
+    reel();
+  </script>
+</body>
+</html>

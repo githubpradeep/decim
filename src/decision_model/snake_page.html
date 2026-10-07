@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System One · Snake</title>
+  <style>
+    :root {
+      --bg: #07080c;
+      --ink: #f4f1e8;
+      --dim: #8b909c;
+      --line: #22262f;
+      --lime: #ddff4a;
+      --cell: #12141b;
+      --body: #3d4a22;
+      --dead: #ff6b57;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+    body { font-family: ui-sans-serif, "SF Pro Display", "Segoe UI", sans-serif; }
+    .stage {
+      min-height: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(280px, 420px);
+      gap: 36px;
+      align-items: start;
+      padding-top: 72px;
+      justify-content: center;
+      padding: 28px 40px;
+    }
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 28px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 12px; letter-spacing: 0.14em; color: var(--dim);
+    }
+    .badge { border: 1px solid var(--lime); color: var(--lime); border-radius: 999px; padding: 6px 10px; letter-spacing: 0.08em; }
+    #board {
+      display: grid;
+      gap: 3px;
+      padding: 10px;
+      background: #0c0e13;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+    }
+    .sq { width: 28px; height: 28px; border-radius: 5px; background: var(--cell); }
+    .sq.head { background: var(--lime); }
+    .sq.body { background: var(--body); }
+    .sq.food { background: var(--lime); border-radius: 99px; }
+    .sq.aim { outline: 2px solid var(--lime); outline-offset: -2px; }
+    .sq.crash { background: var(--dead); }
+    aside h1 { margin: 0 0 8px; font-size: 56px; letter-spacing: -0.045em; line-height: 0.95; }
+    .prob { font-family: ui-monospace, Menlo, monospace; color: var(--lime); font-size: 28px; margin-bottom: 16px; }
+    .row { display: grid; grid-template-columns: 64px 1fr 42px; gap: 8px; align-items: center; margin: 0 0 8px; }
+    .row span, .row b { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+    .row b { text-align: right; }
+    .track { height: 8px; background: #22262f; border-radius: 99px; overflow: hidden; }
+    .fill { height: 100%; width: 0; background: #3a3f4a; }
+    .row.lead .fill { background: var(--lime); }
+    .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
+    .meter { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .meter small { color: var(--dim); font-family: ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: 0.08em; }
+    .meter strong { display: block; margin-top: 4px; font-size: 22px; }
+    pre {
+      margin: 0; white-space: pre-wrap; color: var(--dim);
+      font: 12px/1.45 ui-monospace, Menlo, monospace;
+      max-height: 220px; overflow: auto;
+    }
+    #status { min-height: 1.2em; color: var(--dead); font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+    @media (max-width: 860px) {
+      .stage { grid-template-columns: 1fr; padding: 72px 16px 24px; }
+      .sq { width: 16px; height: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>SYSTEM ONE</div>
+    <div class="badge" id="badge">0 OUTPUT TOKENS</div>
+  </header>
+  <div class="stage">
+    <div id="board"></div>
+    <aside>
+      <h1 id="choice">…</h1>
+      <div class="prob" id="pchoice"></div>
+      <div id="bars"></div>
+      <div class="meters">
+        <div class="meter"><small>SAFE ROUTE</small><strong id="safe">—</strong></div>
+        <div class="meter"><small>FOOD REACHABLE</small><strong id="food">—</strong></div>
+      </div>
+      <p id="status"></p>
+      <pre id="state"></pre>
+    </aside>
+  </div>
+  <script>
+    const W = 16, H = 16;
+    const ORDER = ["UP", "DOWN", "LEFT", "RIGHT"];
+    const VEC = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] };
+    const NAME = { UP: "up", DOWN: "down", LEFT: "left", RIGHT: "right" };
+    const boardEl = document.querySelector("#board");
+    boardEl.style.gridTemplateColumns = `repeat(${W}, 28px)`;
+    const cells = [];
+    for (let i = 0; i < W * H; i++) {
+      const cell = document.createElement("div");
+      cell.className = "sq";
+      boardEl.append(cell);
+      cells.push(cell);
+    }
+
+    let snake, food, score, alive, running;
+    const stats = { deaths: 0, best: 0 };
+
+    function key(x, y) { return `${x},${y}`; }
+    function inside(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
+    function occupied(set, x, y) { return set.has(key(x, y)); }
+
+    function placeFood(body) {
+      const open = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!occupied(body, x, y)) open.push([x, y]);
+      return open[Math.floor(Math.random() * open.length)];
+    }
+
+    function reset() {
+      snake = [{ x: 6, y: 8 }, { x: 5, y: 8 }, { x: 4, y: 8 }];
+      const body = new Set(snake.map((p) => key(p.x, p.y)));
+      food = placeFood(body);
+      score = 0;
+      alive = true;
+      document.querySelector("#status").textContent = "";
+      draw();
+    }
+
+    function draw(aim, crash) {
+      const body = new Set(snake.map((p) => key(p.x, p.y)));
+      const head = snake[0];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const cell = cells[y * W + x];
+          cell.className = "sq";
+          if (food && food[0] === x && food[1] === y) cell.classList.add("food");
+          if (occupied(body, x, y)) cell.classList.add(x === head.x && y === head.y ? "head" : "body");
+          if (aim && aim[0] === x && aim[1] === y) cell.classList.add("aim");
+          if (crash && crash[0] === x && crash[1] === y) cell.classList.add("crash");
+        }
+      }
+    }
+
+    function look(dir, head, body) {
+      const [dx, dy] = VEC[dir];
+      const x = head.x + dx, y = head.y + dy;
+      if (!inside(x, y)) return { x, y, kind: "wall" };
+      if (occupied(body, x, y) && !(x === snake[snake.length - 1].x && y === snake[snake.length - 1].y)) return { x, y, kind: "body" };
+      if (food && x === food[0] && y === food[1]) return { x, y, kind: "food" };
+      return { x, y, kind: "empty" };
+    }
+
+    function reachable(head, body) {
+      const blocked = new Set(body);
+      blocked.delete(key(snake[snake.length - 1].x, snake[snake.length - 1].y));
+      const seen = new Set([key(head.x, head.y)]);
+      const queue = [[head.x, head.y]];
+      while (queue.length) {
+        const [x, y] = queue.shift();
+        for (const dir of ORDER) {
+          const [dx, dy] = VEC[dir];
+          const nx = x + dx, ny = y + dy;
+          const id = key(nx, ny);
+          if (!inside(nx, ny) || seen.has(id) || blocked.has(id)) continue;
+          if (food && nx === food[0] && ny === food[1]) return true;
+          seen.add(id);
+          queue.push([nx, ny]);
+        }
+      }
+      return false;
+    }
+
+    function describe() {
+      const head = snake[0];
+      const body = new Set(snake.map((p) => key(p.x, p.y)));
+      const dx = food[0] - head.x, dy = food[1] - head.y;
+      const east = dx > 0 ? `${dx} columns east` : dx < 0 ? `${-dx} columns west` : "the same column";
+      const north = dy < 0 ? `${-dy} rows north` : dy > 0 ? `${dy} rows south` : "the same row";
+      const views = {};
+      const closer = [];
+      const blocked = [];
+      const open = [];
+      for (const dir of ORDER) {
+        const cell = look(dir, head, body);
+        views[dir] = cell;
+        const phrase = cell.kind === "wall" ? "a wall" : cell.kind === "body" ? "the snake's body" : cell.kind === "food" ? "the food" : "empty space";
+        if (cell.kind === "wall" || cell.kind === "body") blocked.push(NAME[dir]);
+        else {
+          open.push(NAME[dir]);
+          const nd = Math.abs(cell.x - food[0]) + Math.abs(cell.y - food[1]);
+          const hd = Math.abs(dx) + Math.abs(dy);
+          if (cell.kind === "food" || nd < hd) closer.push(NAME[dir]);
+        }
+      }
+      const safe = open.length > 0;
+      const foodOpen = reachable(head, body);
+      const lines = [
+        `Snake on a ${W} by ${H} board. Length ${snake.length}. Score ${score}.`,
+        `Head at column ${head.x + 1}, row ${head.y + 1}.`,
+        `Food is ${east} and ${north} of the head.`,
+        ...ORDER.map((dir) => `The cell ${NAME[dir]} of the head is ${views[dir].kind === "wall" ? "a wall" : views[dir].kind === "body" ? "the snake's body" : views[dir].kind === "food" ? "the food" : "empty"}.`),
+        `Moves into a wall or the body: ${blocked.join(", ") || "none"}.`,
+        `Moves into empty space or food: ${open.join(", ") || "none"}.`,
+        `Moves that reduce the distance to the food: ${closer.join(", ") || "none"}.`,
+        `A safe route is available: ${safe ? "yes" : "no"}.`,
+        `Food is reachable through empty cells: ${foodOpen ? "yes" : "no"}.`,
+      ];
+      return { text: lines.join("\n"), safe, foodOpen, views };
+    }
+
+    function payload(text) {
+      return {
+        state: text,
+        questions: {
+          move: {
+            type: "choice",
+            instructions: "Which direction should the snake move?",
+            criteria: { UP: "up", DOWN: "down", LEFT: "left", RIGHT: "right" },
+          },
+          safe: { type: "noul", instructions: "Is a safe route available?" },
+          food: { type: "noul", instructions: "Is food reachable through empty cells?" },
+        },
+      };
+    }
+
+    function paintBars(probs, choice) {
+      const box = document.querySelector("#bars");
+      box.replaceChildren();
+      for (const dir of ORDER) {
+        const row = document.createElement("div");
+        row.className = dir === choice ? "row lead" : "row";
+        const value = probs[dir] || 0;
+        row.innerHTML = `<span>${NAME[dir]}</span><div class="track"><div class="fill" style="width:${value * 100}%"></div></div><b>${value.toFixed(2)}</b>`;
+        box.append(row);
+      }
+    }
+
+    async function decide() {
+      const facts = describe();
+      document.querySelector("#state").textContent = facts.text;
+      const response = await fetch("/v1/systemone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload(facts.text)),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "request failed");
+      document.querySelector("#badge").textContent = `${body.usage.output_tokens} OUTPUT TOKENS`;
+      const move = body.answers.move;
+      document.querySelector("#choice").textContent = NAME[move.choice].toUpperCase();
+      document.querySelector("#pchoice").textContent = move.probabilities[move.choice].toFixed(2);
+      paintBars(move.probabilities, move.choice);
+      document.querySelector("#safe").textContent = body.answers.safe.noul >= 0.5 ? "yes" : "no";
+      document.querySelector("#food").textContent = body.answers.food.noul >= 0.5 ? "yes" : "no";
+      return { choice: move.choice, views: facts.views };
+    }
+
+    function step(choice) {
+      const head = snake[0];
+      const cell = look(choice, head, new Set(snake.map((p) => key(p.x, p.y))));
+      if (cell.kind === "wall" || cell.kind === "body") {
+        alive = false;
+        draw(null, inside(cell.x, cell.y) ? [cell.x, cell.y] : [head.x, head.y]);
+        stats.deaths += 1;
+        stats.best = Math.max(stats.best, score);
+        document.querySelector("#status").textContent = `Crash. Deaths ${stats.deaths}. Best score ${stats.best}.`;
+        return;
+      }
+      snake.unshift({ x: cell.x, y: cell.y });
+      if (cell.kind === "food") {
+        score += 1;
+        stats.best = Math.max(stats.best, score);
+        const body = new Set(snake.map((p) => key(p.x, p.y)));
+        food = placeFood(body);
+      } else {
+        snake.pop();
+      }
+      draw([cell.x, cell.y]);
+    }
+
+    function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+    async function loop() {
+      if (running) return;
+      running = true;
+      reset();
+      while (running) {
+        try {
+          if (!alive) {
+            await sleep(900);
+            reset();
+          }
+          const decision = await decide();
+          const head = snake[0];
+          const [dx, dy] = VEC[decision.choice];
+          draw([head.x + dx, head.y + dy]);
+          await sleep(160);
+          step(decision.choice);
+          await sleep(80);
+        } catch (error) {
+          document.querySelector("#status").textContent = error.message;
+          await sleep(600);
+        }
+      }
+    }
+
+    loop();
+  </script>
+</body>
+</html>

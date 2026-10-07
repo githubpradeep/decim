@@ -1,0 +1,38 @@
+{
+  "state": {
+    "channel": "chat",
+    "customer": "Erin Blake",
+    "subject": "Screen still says label created",
+    "body": "The shoes are on my floor. The carrier finished yesterday. Your order page still says label created. I am asking you to fix the page, not the carrier. This week is fine."
+  },
+  "questions": {
+    "queue": {
+      "type": "choice",
+      "instructions": "Which queue should own this ticket? Choose the team that can resolve what the customer is actually asking for. A mention of another team's words is not enough.",
+      "criteria": {
+        "billing": "Charges, invoices, refunds, taxes, and payment methods",
+        "shipping": "Package location, delivery address, carriers, and items lost or damaged in transit",
+        "access": "Login, password, two-factor, locked accounts, and sessions",
+        "product": "The app or website: bugs, outages, and how a feature works"
+      }
+    },
+    "escalate": {
+      "type": "noul",
+      "instructions": "Does a supervisor need to take this now? Yes means a legal threat, an account compromise, a repeated failure after an earlier attempt, or a site-wide outage. A ticket can be urgent and still stay with the queue.",
+      "criteria": {
+        "false": "The owning queue can handle it",
+        "true": "A supervisor should take it now"
+      }
+    },
+    "priority": {
+      "type": "score",
+      "instructions": "How soon does this customer need a response? Can wait means no deadline. This week means a normal service request. Today means they are blocked today. Right now means an incident in progress.",
+      "criteria": [
+        "Can wait",
+        "This week",
+        "Today",
+        "Right now"
+      ]
+    }
+  }
+}

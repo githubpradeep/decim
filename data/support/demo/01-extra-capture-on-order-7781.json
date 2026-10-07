@@ -1,0 +1,38 @@
+{
+  "state": {
+    "channel": "email",
+    "customer": "Alice Berger",
+    "subject": "Extra capture on order 7781",
+    "body": "Order 7781 was delivered this morning, tracking and all. I am writing only because the card was captured twice for $128. Please reverse one capture. I do not need a new shipment."
+  },
+  "questions": {
+    "queue": {
+      "type": "choice",
+      "instructions": "Which queue should own this ticket? Choose the team that can resolve what the customer is actually asking for. A mention of another team's words is not enough.",
+      "criteria": {
+        "billing": "Charges, invoices, refunds, taxes, and payment methods",
+        "shipping": "Package location, delivery address, carriers, and items lost or damaged in transit",
+        "access": "Login, password, two-factor, locked accounts, and sessions",
+        "product": "The app or website: bugs, outages, and how a feature works"
+      }
+    },
+    "escalate": {
+      "type": "noul",
+      "instructions": "Does a supervisor need to take this now? Yes means a legal threat, an account compromise, a repeated failure after an earlier attempt, or a site-wide outage. A ticket can be urgent and still stay with the queue.",
+      "criteria": {
+        "false": "The owning queue can handle it",
+        "true": "A supervisor should take it now"
+      }
+    },
+    "priority": {
+      "type": "score",
+      "instructions": "How soon does this customer need a response? Can wait means no deadline. This week means a normal service request. Today means they are blocked today. Right now means an incident in progress.",
+      "criteria": [
+        "Can wait",
+        "This week",
+        "Today",
+        "Right now"
+      ]
+    }
+  }
+}
